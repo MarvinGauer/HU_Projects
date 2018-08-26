@@ -22,7 +22,7 @@ def is_date(string):
     except ValueError:
         return False
 
-def EthereumDownloader(sleeper = 2):
+def EthereumContractDownloader(sleeper = 2, dat_output = 'Ethereum_Contracts.csv'):
     # Create soup to get initial information
     start_url = 'https://etherscan.io/contractsVerified/1'
     html      = requests.get(start_url)
@@ -34,6 +34,10 @@ def EthereumDownloader(sleeper = 2):
     # declare number of pages to be scraped and length-vector
     frame     = pd.DataFrame(columns=('Date', 'Hash', 'Tx', 'Balance'))
     l         = [0]
+    
+    with open(dat_output,'w') as file:
+        file.write("Date, Hash, Tx, Balance")
+        file.write('\n')
     
     # loop through pages and downlaod necessary information
     for i in range(1,n_page + 1):
@@ -68,7 +72,7 @@ def EthereumDownloader(sleeper = 2):
         l.append(len(add))
         
         # write data into .csv-file for later usage
-        with open('Ethereum.csv','a') as file:
+        with open(dat_output,'a') as file:
             for j in range(sum(l[0:i]),sum(l[0:(i+1)])):
                 row          = [date[j - sum(l[0:i])],add[j - sum(l[0:i])], tx[j - sum(l[0:i])], bal[j - sum(l[0:i])]]
                 frame.loc[j] = row
@@ -79,16 +83,104 @@ def EthereumDownloader(sleeper = 2):
         time.sleep(sleeper)
     
     return frame
+        
+def EthereumTransactionDownloader(contract_identifier = None, sleeper = 2, dat_output = 'Ethereum_Tx.csv', mode = 'a'):
+    if mode == 'w':
+        # Add Header
+        with open(dat_output,'w') as file:
+                file.write("Block, Contract, Date, From, Gas, To, Value")
+                file.write('\n')
+    j = 1
+    for contract in contract_identifier:
+        html      = requests.get('https://etherscan.io/txs?a=' + contract + '&p=1')
+        soup      = BeautifulSoup(html.text, "html5lib")
+        tx_n_page = int(str(soup.select('.pull-right b')[1])[3:-4])
+        print(67*'-')
+        print(67*'-')
+        print('Starting download for contract ' + str(j) + ' of ' + str(len(contract_identifier)))
+        print('Initializing download of ' + contract)
+        print(67*'-')
+        j += 1
 
-# Main
+        for page in range(1,tx_n_page+1):
+            print('-> Downloading transactions on page ' + str(page) + ' of ' + str(tx_n_page))
 
-try:
-    df = pd.read_csv("/Users/MarvinGauer/Ethereum.csv")
-    q  = input("An Ethereum.csv-file already exists. Do you want to update it?(y/n) ")
-    if q == 'y':
-        df = EthereumDownloader(sleeper = 0)
-    elif q == 'n':
-        print('-> Existing file is used')
-except:
-    df = EthereumDownloader(sleeper = 0)
+            html      = requests.get('https://etherscan.io/txs?a=' + contract + '&p=' + str(page))
+            soup      = BeautifulSoup(html.text, "html5lib")
+            tx_data   = soup.select('td')
+            tx_block  = [re.findall('/block/[0-9]{7}">', str(d))[0][7:-2] for d in tx_data if re.findall('/block/[0-9]{7}">', str(d)) != []]
+            tx_date   = [re.findall('rel="tooltip" title="[A-Za-z0-9]{1,3}-[0-9]{2}-[0-9]{2,4} ', str(d))[0][21:-1] for d in tx_data if re.findall('rel="tooltip" title="[A-Za-z0-9]{1,3}-[0-9]{2}-[0-9]{2,4} ', str(d)) != [] if is_date(re.findall('rel="tooltip" title="[A-Za-z0-9]{1,3}-[0-9]{2}-[0-9]{2,4} ', str(d))[0][21:-1])]
+            tx_value  = []
+            k         = 6
+            while k <= len(tx_data):
+                if len(re.findall('[0-9]+<b>.</b>|[0-9]+ \w+', str(tx_data[k]))) > 1:
+                    a = re.findall('[0-9]+<b>.</b>|[0-9]+ \w+', str(tx_data[k]))[0][:-8] + '.' + re.findall('[0-9]+<b>.</b>|[0-9]+ \w+', str(tx_data[k]))[1]
+                    tx_value.append(a)
+                else:
+                    try:
+                        tx_value.append(re.findall('[0-9]+<b>.</b>|[0-9]+ \w+', str(tx_data[k]))[0])
+                    except:
+                        tx_value.append('None')
+                k += 8
+            tx_value = tx_value[:-1]
+            tx_gas = []
+            k        = 7
+            while k <= len(tx_data):
+                if len(re.findall('[0-9]+<b>.</b>|[0-9]+<', str(tx_data[k]))) > 1:
+                    a = re.findall('[0-9]+<b>.</b>|[0-9]+<', str(tx_data[k]))[0][:-8] + '.' + re.findall('[0-9]+<b>.</b>|[0-9]+<', str(tx_data[k]))[1][:-1]
+                    tx_gas.append(a)
+                else:
+                    try:
+                        tx_gas.append(re.findall('[0-9]+<b>.</b>|[0-9]+<', str(tx_data[k]))[0][:-1])
+                    except:
+                        tx_gas.append('None')
+                k += 8
+            tx_gas = tx_gas[:-1]
+            tx_from  = [re.findall('">[A-Za-z0-9]{42}</a></span></td>', str(d))[0][2:-16] for d in tx_data if re.findall('">[A-Za-z0-9]{42}</a></span></td>', str(d)) != []]
+            tx_to    = [re.findall('"address-tag">[A-Za-z0-9]+</span></span></td>', str(d))[0][14:-19] for d in tx_data if re.findall('"address-tag">[A-Za-z0-9]+</span></span></td>', str(d)) != []]
+            if len(tx_to) != 50:
+                tx_to.append('Contract Creation')
+            tx_contract= [contract for d in range(len(tx_date))]
+            try:
+                page_frame = pd.DataFrame(
+                    {'tx_contract': tx_contract,
+                     'tx_date'    : tx_date,
+                     'tx_value'   : tx_value,
+                     'tx_gas'     : tx_gas,
+                     'tx_block'   : tx_block,
+                     'tx_from'    : tx_from,
+                     'tx_to'      : tx_to
+                    })
+            except:
+                print(25*'-'+'Error-Report-Start'+23*'-')
+                print("---> Hash " + str(contract))
+                print("Contract: " + str(len(tx_contract)))
+                print('Value: ' + str(len(tx_value)))
+                print('Gas: ' + str(len(tx_gas)))
+                print('Date: ' + str(len(tx_date)))
+                print('From: ' + str(len(tx_from)))
+                print('To: ' + str(len(tx_to)))
+                print(25*'-'+'Error-Report-Start'+23*'-')
 
+            with open(dat_output,'a') as file:
+                for j in range(0,len(page_frame)):
+                    file.write(', '.join([str(element) for element in page_frame.loc[j]]))
+                    file.write('\n')
+
+            time.sleep(sleeper)
+    print(67*'-')
+    print(46*'-' + '> Download completed!')
+
+# Download Contracts
+#EthereumContractDownloader()    
+    
+# Example Contracts to download Transactions from
+ci = ['0x29d1487bbbce6f3766db1d36a5eea93ca01a2a75', '0x365267181bc0ef38bbb8d8ca9b330dc0c3ac01d1']
+EthereumTransactionDownloader(contract_identifier = ci, mode = 'a')
+
+# Import Data
+dat_input  = 'Ethereum.csv'
+dat_output = 'Ethereum_Tx.csv'
+
+df_Tx        = pd.read_csv(dat_output, sep =',')
+df_Contracts = pd.read_csv(dat_input, sep =';')
