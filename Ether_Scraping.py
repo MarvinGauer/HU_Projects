@@ -176,7 +176,7 @@ def EthereumTransactionDownloader(contract_identifier = None, sleeper = 2, dat_o
     
 # Example Contracts to download Transactions from
 ci = ['0x29d1487bbbce6f3766db1d36a5eea93ca01a2a75', '0x365267181bc0ef38bbb8d8ca9b330dc0c3ac01d1']
-EthereumTransactionDownloader(contract_identifier = ci, mode = 'a')
+EthereumTransactionDownloader(contract_identifier = ci, mode = 'w')
 
 # Import Data
 dat_input  = 'Ethereum.csv'
