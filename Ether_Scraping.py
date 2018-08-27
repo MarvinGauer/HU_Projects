@@ -12,7 +12,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy import stats
 import numpy as np
+import json
 
+# Functions
 
 # check if a string is a date
 def is_date(string):
@@ -171,16 +173,64 @@ def EthereumTransactionDownloader(contract_identifier = None, sleeper = 2, dat_o
     print(67*'-')
     print(46*'-' + '> Download completed!')
 
+def EthereumSourceCode(contract_identifier = None, dat_output = 'Ethereum_SourceCode.csv', API_Code = 'KPDQ8J6VWUH7UE61YSU14U3A76AYB8S7KN'):
+    #with open(dat_output,'w') as file:
+    #        file.write("Contract, Name, SourceCode")
+    #        file.write('\n')
+    j = 1
+    for contract in contract_identifier:
+        print('Downloading SourceCode ' + str(j) + ' of ' + str(len(contract_identifier)))
+        link = 'https://api.etherscan.io/api?module=contract&action=getsourcecode&address=' + contract + '&apikey=' + API_Code
+        json = requests.get(link)
+        data = dict(json.json())
+        try:
+            name = data['result'][0]['ContractName']
+            code = '"' + data['result'][0]['SourceCode'] + '"'
+        except:
+            name = ''
+            code = ''
+            print(25*'-'+'Error-Report-Start'+23*'-')
+            print("---> Hash " + str(contract))
+            print("No Source Code Available")
+            print(25*'-'+'Error-Report-Start'+23*'-')
+        try:
+            page_frame = pd.DataFrame(
+                {'Contract'     : [contract],
+                 'Name'         : [name],
+                 'SourceCode'   : [code]
+                })
+        except:
+            print(25*'-'+'Error-Report-Start'+23*'-')
+            print("---> Hash " + str(contract))
+            print(25*'-'+'Error-Report-Start'+23*'-')
+        with open(dat_output,'a') as file:
+                file.write(', '.join([str(element) for element in page_frame.loc[0]]))
+                file.write('\n')
+        j += 1
+        
+# Main
+
+API_Key = 'Type in your API-Key here'
+
+# Contract's Source Code
+dat_output_SC = 'Ethereum_SourceCode.csv'
+
 # Download Contracts
-#EthereumContractDownloader()    
+# Takes about 2 hours
+# EthereumContractDownloader()    
     
 # Example Contracts to download Transactions from
 ci = ['0x29d1487bbbce6f3766db1d36a5eea93ca01a2a75', '0x365267181bc0ef38bbb8d8ca9b330dc0c3ac01d1']
+# It will download roughly 100 Mio. transactions if all contracts in csv-file are used. 
 EthereumTransactionDownloader(contract_identifier = ci, mode = 'w')
 
 # Import Data
-dat_input  = 'Ethereum.csv'
-dat_output = 'Ethereum_Tx.csv'
+dat_input_C  = 'Ethereum.csv'
+dat_output_Tx = 'Ethereum_Tx.csv'
 
-df_Tx        = pd.read_csv(dat_output, sep =',')
-df_Contracts = pd.read_csv(dat_input, sep =';')
+#df_Tx        = pd.read_csv(dat_output_Tx, sep =',')
+df_Contracts = pd.read_csv(dat_input_C, sep =';')
+
+contracts = [c.strip() for c in df_Contracts['Contract_Identifier'].tolist()]
+#Downloading the Source Codes needs about 8 hours and 500 MB
+#EthereumSourceCode(contract_identifier = contracts, dat_output = 'Ethereum_SourceCode.csv', API_Code = API_Key)
