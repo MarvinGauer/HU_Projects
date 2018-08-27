@@ -233,4 +233,4 @@ df_Contracts = pd.read_csv(dat_input_C, sep =';')
 
 contracts = [c.strip() for c in df_Contracts['Contract_Identifier'].tolist()]
 #Downloading the Source Codes needs about 8 hours and 500 MB
-#EthereumSourceCode(contract_identifier = contracts, dat_output = 'Ethereum_SourceCode.csv', API_Code = API_Key)
+#EthereumSourceCode(contract_identifier = contracts, dat_output = dat_output_SC, API_Code = API_Key)
